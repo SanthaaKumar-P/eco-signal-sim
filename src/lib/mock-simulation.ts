@@ -57,7 +57,7 @@ export function createMockSnapshot(timestamp = 120, rlControl = true): Simulatio
 
   const signals: Signal[] = intersections.map((intersection, index) => {
     const phaseIndex = Math.floor(timestamp / 12 + index) % 4;
-    const phase = (["NS_GREEN", "EW_GREEN", "YELLOW", "ALL_RED"] as const)[phaseIndex];
+    const phase = (["NS_GREEN", "EW_GREEN", "YELLOW", "ALL_RED"] as const)[phaseIndex] ?? "NS_GREEN";
     return {
       id: intersection.id,
       phase,
@@ -104,6 +104,16 @@ export function getMockHotspots(snapshot: SimulationSnapshot): Hotspot[] {
 
 export function getMockDecision(snapshot: SimulationSnapshot, enabled: boolean): RlDecision {
   const focus = [...snapshot.intersections].sort((a, b) => b.co2 - a.co2)[0];
+  if (!focus) {
+    return {
+      agent: "PPO",
+      status: enabled ? "ACTIVE" : "STANDBY",
+      objective: "Traffic efficiency + carbon reduction",
+      action: "Awaiting intersection telemetry",
+      reason: "No intersection data is available yet",
+      source: "mock",
+    };
+  }
   const action = enabled && focus.queueLength > 14 ? "Extend East–West green phase" : "Monitor current cycle";
   return {
     agent: "PPO",

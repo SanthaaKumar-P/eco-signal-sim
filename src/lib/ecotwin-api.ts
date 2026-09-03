@@ -6,7 +6,7 @@ import type {
   SimulationSnapshot,
 } from "@/lib/ecotwin-types";
 
-const apiBase = import.meta.env.VITE_ECOTWIN_API_URL ?? "";
+const apiBase = import.meta.env["VITE_ECOTWIN_API_URL"] ?? "";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -34,7 +34,7 @@ export const ecotwinApi = {
       body: JSON.stringify({ enabled }),
     }),
   websocketUrl: () => {
-    if (import.meta.env.VITE_ECOTWIN_WS_URL) return import.meta.env.VITE_ECOTWIN_WS_URL;
+    if (import.meta.env["VITE_ECOTWIN_WS_URL"]) return import.meta.env["VITE_ECOTWIN_WS_URL"];
     if (typeof window === "undefined") return "ws://localhost:8000/ws/simulation";
     return `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/simulation`;
   },
