@@ -1,0 +1,1 @@
+"""Typed API models for simulation telemetry."""
