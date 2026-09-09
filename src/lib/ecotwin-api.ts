@@ -5,6 +5,7 @@ import type {
   Metrics,
   SimulationSnapshot,
 } from "@/lib/ecotwin-types";
+import type { SimulationState } from "@/lib/simulation-contract";
 
 const apiBase = import.meta.env["VITE_ECOTWIN_API_URL"] ?? "";
 
@@ -25,6 +26,7 @@ export const ecotwinApi = {
   signals: () => request<SimulationSnapshot["signals"]>("/api/signals"),
   hotspots: () => request<Hotspot[]>("/api/pollution/hotspots"),
   comparison: () => request<ComparisonResult>("/api/comparison"),
+  decision: () => request<SimulationState["rl"]>("/api/rl/decision"),
   start: () => request<{ status: string }>("/api/simulation/start", { method: "POST" }),
   pause: () => request<{ status: string }>("/api/simulation/pause", { method: "POST" }),
   reset: () => request<{ status: string }>("/api/simulation/reset", { method: "POST" }),
