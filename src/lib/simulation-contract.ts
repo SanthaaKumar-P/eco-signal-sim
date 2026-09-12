@@ -155,50 +155,50 @@ export function snapshotToState(snapshot: SimulationSnapshot, rlEnabled: boolean
 
 export function payloadToState(payload: unknown): SimulationState {
   const value = payload as Record<string, unknown>;
-  const metrics = (value.metrics ?? {}) as Record<string, unknown>;
-  const rawVehicles = Array.isArray(value.vehicles) ? value.vehicles : [];
-  const rawSignals = Array.isArray(value.signals) ? value.signals : [];
-  const rawIntersections = Array.isArray(value.intersections) ? value.intersections : [];
+  const metrics = (value["metrics"] ?? {}) as Record<string, unknown>;
+  const rawVehicles = Array.isArray(value["vehicles"]) ? value["vehicles"] : [];
+  const rawSignals = Array.isArray(value["signals"]) ? value["signals"] : [];
+  const rawIntersections = Array.isArray(value["intersections"]) ? value["intersections"] : [];
   const state = {
-    timestamp: value.timestamp,
-    simulation_status: value.simulation_status ?? value.simulationStatus,
+    timestamp: value["timestamp"],
+    simulation_status: value["simulation_status"] ?? value["simulationStatus"],
     vehicles: rawVehicles.map((item) => {
       const vehicle = item as Record<string, unknown>;
-      return { ...vehicle, waiting_time: vehicle.waiting_time ?? vehicle.waitingTime ?? 0 };
+      return { ...vehicle, waiting_time: vehicle["waiting_time"] ?? vehicle["waitingTime"] ?? 0 };
     }),
     signals: rawSignals.map((item) => {
       const signal = item as Record<string, unknown>;
       return {
         ...signal,
-        remaining_seconds: signal.remaining_seconds ?? signal.remaining ?? 0,
-        rl_controlled: signal.rl_controlled ?? signal.rlControlled ?? false,
-        state: signal.state ?? signal.phase,
+        remaining_seconds: signal["remaining_seconds"] ?? signal["remaining"] ?? 0,
+        rl_controlled: signal["rl_controlled"] ?? signal["rlControlled"] ?? false,
+        state: signal["state"] ?? signal["phase"],
       };
     }),
     intersections: rawIntersections.map((item) => {
       const intersection = item as Record<string, unknown>;
-      const co2 = Number(intersection.co2 ?? 0);
+      const co2 = Number(intersection["co2"] ?? 0);
       return {
-        ...intersection, queue_length: intersection.queue_length ?? intersection.queueLength ?? 0,
-        waiting_time: intersection.waiting_time ?? intersection.waitingTime ?? 0,
-        pollution_level: intersection.pollution_level ?? bandFor(co2),
-        rl_action: intersection.rl_action ?? intersection.rlAction ?? "Maintain cycle",
+        ...intersection, queue_length: intersection["queue_length"] ?? intersection["queueLength"] ?? 0,
+        waiting_time: intersection["waiting_time"] ?? intersection["waitingTime"] ?? 0,
+        pollution_level: intersection["pollution_level"] ?? bandFor(co2),
+        rl_action: intersection["rl_action"] ?? intersection["rlAction"] ?? "Maintain cycle",
       };
     }),
-    pollution_cells: value.pollution_cells ?? rawIntersections.map((item) => {
+    pollution_cells: value["pollution_cells"] ?? rawIntersections.map((item) => {
       const intersection = item as Record<string, unknown>;
-      const co2 = Number(intersection.co2 ?? 0);
-      return { id: intersection.id, x: intersection.x, y: intersection.y, co2, pollution_level: bandFor(co2) };
+      const co2 = Number(intersection["co2"] ?? 0);
+      return { id: intersection["id"], x: intersection["x"], y: intersection["y"], co2, pollution_level: bandFor(co2) };
     }),
     metrics: {
-      vehicle_count: metrics.vehicle_count ?? metrics.vehicleCount ?? 0,
-      avg_waiting_time: metrics.avg_waiting_time ?? metrics.avgWaitingTime ?? 0,
-      total_co2: metrics.total_co2 ?? metrics.totalCo2 ?? 0,
-      avg_queue_length: metrics.avg_queue_length ?? metrics.queueLength ?? 0,
-      throughput: metrics.throughput ?? metrics.vehicle_count ?? metrics.vehicleCount ?? 0,
-      rl_reward: metrics.rl_reward ?? metrics.rlReward ?? 0,
+      vehicle_count: metrics["vehicle_count"] ?? metrics["vehicleCount"] ?? 0,
+      avg_waiting_time: metrics["avg_waiting_time"] ?? metrics["avgWaitingTime"] ?? 0,
+      total_co2: metrics["total_co2"] ?? metrics["totalCo2"] ?? 0,
+      avg_queue_length: metrics["avg_queue_length"] ?? metrics["queueLength"] ?? 0,
+      throughput: metrics["throughput"] ?? metrics["vehicle_count"] ?? metrics["vehicleCount"] ?? 0,
+      rl_reward: metrics["rl_reward"] ?? metrics["rlReward"] ?? 0,
     },
-    rl: value.rl ?? {
+    rl: value["rl"] ?? {
       enabled: true, algorithm: "PPO", framework: "RLlib", current_action: null,
       reason: null, status: "ACTIVE", source: "backend",
     },

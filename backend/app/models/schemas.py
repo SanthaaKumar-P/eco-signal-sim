@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 SignalPhase = Literal["NS_GREEN", "EW_GREEN", "YELLOW", "ALL_RED"]
+PollutionLevel = Literal["LOW", "MODERATE", "HIGH", "CRITICAL"]
 
 
 class Vehicle(BaseModel):
@@ -11,43 +12,63 @@ class Vehicle(BaseModel):
     x: float
     y: float
     speed: float
+    waiting_time: float
     heading: Literal["horizontal", "vertical"]
 
 
 class Signal(BaseModel):
     id: str
     phase: SignalPhase
-    remaining: int
+    state: str
+    remaining_seconds: int
     ns: Literal["GREEN", "YELLOW", "RED"]
     ew: Literal["GREEN", "YELLOW", "RED"]
-    rlControlled: bool
+    rl_controlled: bool
 
 
 class Intersection(BaseModel):
     id: str
     x: float
     y: float
-    queueLength: int
-    waitingTime: float
+    queue_length: int
+    waiting_time: float
     co2: float
-    rlAction: str
+    pollution_level: PollutionLevel
+    rl_action: str
 
 
 class Metrics(BaseModel):
-    vehicleCount: int
-    avgWaitingTime: float
-    queueLength: int
-    totalCo2: float
-    rlReward: float
+    vehicle_count: int
+    avg_waiting_time: float
+    total_co2: float
+    avg_queue_length: float
+    throughput: int
+    rl_reward: float
 
 
-class SimulationSnapshot(BaseModel):
+class SimulationState(BaseModel):
     timestamp: int
-    simulationStatus: Literal["running", "paused", "stopped"]
+    simulation_status: Literal["running", "paused", "stopped", "error"]
     vehicles: list[Vehicle]
     signals: list[Signal]
     intersections: list[Intersection]
+    pollution_cells: list[dict[str, str | float]]
     metrics: Metrics
+    rl: "RlAction"
+
+
+class SimulationSnapshot(SimulationState):
+    """Compatibility name for the backend simulation service."""
+
+
+class RlAction(BaseModel):
+    enabled: bool
+    algorithm: Literal["PPO"] = "PPO"
+    framework: Literal["RLlib"] = "RLlib"
+    current_action: str | None
+    reason: str | None
+    status: Literal["ACTIVE", "STANDBY", "DEMO"]
+    source: Literal["mock", "backend"]
 
 
 class RlToggle(BaseModel):
