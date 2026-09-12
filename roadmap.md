@@ -1,0 +1,4 @@
+- [ ] Wire the dashboard to the shared simulation stream
+- [ ] Complete normalized backend snapshots and WebSocket lifecycle
+- [ ] Add connection, stopped, and invalid-data states without changing the existing dashboard design
+- [ ] Validate source quality and preview interactions
