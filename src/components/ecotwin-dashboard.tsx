@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   Bot,
@@ -22,7 +23,7 @@ import {
   Wind,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   Line,
@@ -38,6 +39,8 @@ import { MetricCard } from "@/components/metric-card";
 import { Button } from "@/components/ui/button";
 import { addTimelinePoint, createMockSnapshot, getMockDecision, getMockHotspots, getPollutionBand } from "@/lib/mock-simulation";
 import type { SignalPhase, SimulationSnapshot, SimulationStatus, TimelinePoint } from "@/lib/ecotwin-types";
+import { getSimulationMode, createSimulationStream, type StreamConnection } from "@/lib/simulation-stream";
+import { snapshotToState, stateToSnapshot, type SimulationState } from "@/lib/simulation-contract";
 
 type SignalFilter = "all" | "high-co2" | "long-queue" | "rl";
 
@@ -75,7 +78,7 @@ function MetricDelta({ value, positive }: { value: string; positive?: boolean })
   );
 }
 
-function PanelHeading({ eyebrow, title, icon: Icon, action }: { eyebrow: string; title: string; icon: typeof Activity; action?: React.ReactNode }) {
+function PanelHeading({ eyebrow, title, icon: Icon, action }: { eyebrow: string; title: string; icon: typeof Activity; action?: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-line/70 px-4 py-3">
       <div className="flex items-start gap-2.5">
@@ -92,28 +95,51 @@ function PanelHeading({ eyebrow, title, icon: Icon, action }: { eyebrow: string;
 
 function EcoTwinDashboard() {
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(initialSnapshot);
+  const [simulationState, setSimulationState] = useState<SimulationState>(() => snapshotToState(initialSnapshot, true));
   const [timeline, setTimeline] = useState<TimelinePoint[]>(initialTimeline);
   const [status, setStatus] = useState<SimulationStatus>("running");
   const [rlControl, setRlControl] = useState(true);
+  const [connection, setConnection] = useState<StreamConnection>(getSimulationMode() === "mock" ? "mock" : "connecting");
   const [heatmap, setHeatmap] = useState(true);
   const [vehiclesVisible, setVehiclesVisible] = useState(true);
   const [selectedId, setSelectedId] = useState("INT-05");
   const [signalFilter, setSignalFilter] = useState<SignalFilter>("all");
-  const timestampRef = useRef(120);
+  const stream = useMemo(() => createSimulationStream(), []);
+  const lastTimestampRef = useRef(initialSnapshot.timestamp);
 
   useEffect(() => {
-    if (status !== "running") return;
-    const interval = window.setInterval(() => {
-      timestampRef.current += 3;
-      const next = createMockSnapshot(timestampRef.current, rlControl);
-      setSnapshot(next);
-      setTimeline((points) => [...points.slice(-23), addTimelinePoint(next)]);
-    }, 1500);
-    return () => window.clearInterval(interval);
-  }, [rlControl, status]);
+    const unsubscribeState = stream.subscribe((nextState) => {
+      const nextSnapshot = stateToSnapshot(nextState);
+      setSimulationState(nextState);
+      setSnapshot(nextSnapshot);
+      setStatus(nextSnapshot.simulationStatus);
+      setRlControl(nextState.rl.enabled);
+      if (nextState.timestamp !== lastTimestampRef.current) {
+        lastTimestampRef.current = nextState.timestamp;
+        setTimeline((points) => [...points.slice(-23), addTimelinePoint(nextSnapshot)]);
+      }
+    });
+    const unsubscribeConnection = stream.subscribeConnection(setConnection);
+    stream.start();
+    return () => {
+      unsubscribeState();
+      unsubscribeConnection();
+      stream.stop();
+    };
+  }, [stream]);
 
   const hotspots = useMemo(() => getMockHotspots(snapshot), [snapshot]);
-  const decision = useMemo(() => getMockDecision(snapshot, rlControl), [rlControl, snapshot]);
+  const decision = useMemo(() => {
+    if (getSimulationMode() === "mock") return getMockDecision(snapshot, rlControl);
+    return {
+      agent: simulationState.rl.algorithm,
+      status: simulationState.rl.status === "DEMO" ? "ACTIVE" as const : simulationState.rl.status,
+      objective: "Traffic efficiency + carbon reduction",
+      action: simulationState.rl.current_action ?? "Awaiting policy telemetry",
+      reason: simulationState.rl.reason ?? "No policy explanation is available yet",
+      source: simulationState.rl.source,
+    };
+  }, [rlControl, simulationState, snapshot]);
   const filteredSignals = useMemo(() => snapshot.signals.filter((signal) => {
     const intersection = snapshot.intersections.find((item) => item.id === signal.id);
     if (!intersection) return false;
@@ -123,17 +149,26 @@ function EcoTwinDashboard() {
     return true;
   }), [signalFilter, snapshot]);
 
-  const resetSimulation = () => {
-    timestampRef.current = 120;
-    const reset = { ...createMockSnapshot(120, rlControl), simulationStatus: "stopped" as const };
-    setSnapshot(reset);
-    setTimeline(initialTimeline);
-    setStatus("stopped");
+  const runCommand = async (command: () => Promise<void>) => {
+    try {
+      await command();
+    } catch {
+      setConnection("error");
+    }
   };
 
-  const toggleRl = () => {
-    setRlControl((enabled) => !enabled);
-  };
+  const resetSimulation = () => runCommand(async () => {
+    await stream.resetSimulation();
+    setTimeline(initialTimeline);
+    lastTimestampRef.current = 120;
+  });
+
+  const toggleRl = () => runCommand(async () => {
+    await stream.toggleRl(!rlControl);
+  });
+
+  const connectionLabel = connection === "mock" ? "Mock simulation" : connection === "connected" ? "Backend connected" : connection === "connecting" ? "Connecting backend" : "Backend offline";
+  const connectionIsHealthy = connection === "mock" || connection === "connected";
 
   return (
     <main className="min-h-screen bg-ink text-foreground">
@@ -147,8 +182,9 @@ function EcoTwinDashboard() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.14em]">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2.5 py-1.5 text-amber"><Radio className="size-3" /> Mock simulation</span>
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-line bg-ink2/70 px-2.5 py-1.5 text-steel-light"><CloudOff className="size-3" /> Backend offline</span>
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 ${connection === "mock" ? "border-amber/30 bg-amber/10 text-amber" : connectionIsHealthy ? "border-green/30 bg-green/10 text-green" : "border-line bg-ink2/70 text-steel-light"}`}>
+              {connection === "mock" ? <Radio className="size-3" /> : connectionIsHealthy ? <Activity className="size-3" /> : <CloudOff className="size-3" />} {connectionLabel}
+            </span>
             <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 ${status === "running" ? "border-green/30 bg-green/10 text-green" : "border-line bg-ink2/70 text-steel-light"}`}><span className={`size-1.5 rounded-full ${status === "running" ? "bg-green" : "bg-steel"}`} />{statusLabel(status)}</span>
           </div>
         </div>
@@ -158,11 +194,18 @@ function EcoTwinDashboard() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div><p className="font-mono text-[10px] uppercase tracking-[0.22em] text-mint">Sector 07 / simulation data</p><p className="mt-1 text-xs text-steel-light">Adaptive signal timing with a replaceable SUMO + PPO data contract.</p></div>
           <div className="flex flex-wrap gap-2">
-            <Button variant={status === "running" ? "primary" : "default"} size="sm" onClick={() => setStatus("running")}><Play className="size-3.5" /> Start</Button>
-            <Button variant={status === "paused" ? "warning" : "default"} size="sm" onClick={() => setStatus("paused")}><Pause className="size-3.5" /> Pause</Button>
+             <Button variant={status === "running" ? "primary" : "default"} size="sm" onClick={() => runCommand(() => stream.startSimulation())}><Play className="size-3.5" /> Start</Button>
+             <Button variant={status === "paused" ? "warning" : "default"} size="sm" onClick={() => runCommand(() => stream.pauseSimulation())}><Pause className="size-3.5" /> Pause</Button>
             <Button variant="default" size="sm" onClick={resetSimulation}><RotateCcw className="size-3.5" /> Reset</Button>
             <Button variant={rlControl ? "active" : "default"} size="sm" aria-pressed={rlControl} onClick={toggleRl}><Bot className="size-3.5" /> RL control {rlControl ? "on" : "off"}</Button>
           </div>
+
+         {(connection === "error" || connection === "disconnected") && (
+           <div className="mb-4 flex items-start gap-2.5 border border-amber/30 bg-amber/10 px-3 py-2.5 text-xs text-amber" role="status">
+             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+             <span>{connection === "error" ? "Telemetry payload unavailable. Showing the last known state while the connection recovers." : "Backend connection lost. Showing the last known state and retrying automatically."}</span>
+           </div>
+         )}
         </div>
 
         <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5" aria-label="Live simulation metrics">
@@ -213,7 +256,7 @@ function EcoTwinDashboard() {
               <div><p className="font-mono text-[9px] uppercase tracking-[0.18em] text-steel">Objective</p><p className="mt-1 text-xs text-steel-light">{decision.objective}</p></div>
               <div className="rounded-lg border border-mint/20 bg-mint/5 p-3"><p className="font-mono text-[9px] uppercase tracking-[0.18em] text-mint">Current action</p><p className="mt-1 text-sm font-medium text-foreground">{decision.action}</p></div>
               <div><p className="font-mono text-[9px] uppercase tracking-[0.18em] text-steel">Demo explanation</p><p className="mt-1 text-xs leading-5 text-steel-light">{decision.reason}</p></div>
-              <div className="flex items-center justify-between border-t border-line/60 pt-3 font-mono text-[10px]"><span className="text-steel">Source</span><span className="text-amber">MOCK POLICY OUTPUT</span></div>
+               <div className="flex items-center justify-between border-t border-line/60 pt-3 font-mono text-[10px]"><span className="text-steel">Source</span><span className={decision.source === "mock" ? "text-amber" : "text-mint"}>{decision.source === "mock" ? "MOCK POLICY OUTPUT" : "BACKEND POLICY OUTPUT"}</span></div>
             </div>
           </section>
         </div>
