@@ -30,7 +30,7 @@ class MockSimulationStream implements SimulationStream {
   private timestamp = 120;
   private status: "running" | "paused" | "stopped" = "running";
   private rlEnabled = true;
-  private interval: ReturnType<typeof window.setInterval> | undefined;
+  private interval: number | undefined;
   private listeners = new Set<(state: SimulationState) => void>();
   private connectionListeners = new Set<(status: StreamConnection) => void>();
 
@@ -77,7 +77,7 @@ class LiveSimulationStream implements SimulationStream {
   private listeners = new Set<(state: SimulationState) => void>();
   private connectionListeners = new Set<(status: StreamConnection) => void>();
   private lastState: SimulationState | undefined;
-  private reconnectTimer: ReturnType<typeof window.setTimeout> | undefined;
+  private reconnectTimer: number | undefined;
 
   start() {
     this.connect();
