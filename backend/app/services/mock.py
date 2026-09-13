@@ -1,6 +1,6 @@
 import math
 
-from app.models.schemas import Intersection, Metrics, PollutionCell, RlAction, Signal, SimulationSnapshot, Vehicle
+from app.models.schemas import Intersection, Metrics, PollutionCell, RlAction, Signal, SignalPhase, SimulationSnapshot, Vehicle
 
 
 class MockSimulationService:
