@@ -33,8 +33,11 @@ class MockSimulationStream implements SimulationStream {
   private interval: number | undefined;
   private listeners = new Set<(state: SimulationState) => void>();
   private connectionListeners = new Set<(status: StreamConnection) => void>();
+  private started = false;
 
   start() {
+    if (this.started) return;
+    this.started = true;
     this.emit();
     this.interval = window.setInterval(() => {
       if (this.status === "running") {
@@ -48,6 +51,7 @@ class MockSimulationStream implements SimulationStream {
   stop() {
     if (this.interval !== undefined) window.clearInterval(this.interval);
     this.interval = undefined;
+    this.started = false;
   }
 
   subscribe(listener: (state: SimulationState) => void) {
@@ -78,12 +82,15 @@ class LiveSimulationStream implements SimulationStream {
   private connectionListeners = new Set<(status: StreamConnection) => void>();
   private lastState: SimulationState | undefined;
   private reconnectTimer: number | undefined;
+  private stopped = false;
 
   start() {
+    this.stopped = false;
     this.connect();
   }
 
   stop() {
+    this.stopped = true;
     if (this.reconnectTimer !== undefined) window.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = undefined;
     this.socket?.close();
@@ -107,6 +114,7 @@ class LiveSimulationStream implements SimulationStream {
   async toggleRl(enabled: boolean) { await ecotwinApi.toggleRl(enabled); }
 
   private connect() {
+    if (this.stopped) return;
     this.connectionListeners.forEach((listener) => listener("connecting"));
     this.socket = new WebSocket(ecotwinApi.websocketUrl());
     this.socket.onopen = () => this.connectionListeners.forEach((listener) => listener("connected"));
@@ -122,7 +130,7 @@ class LiveSimulationStream implements SimulationStream {
     this.socket.onerror = () => this.connectionListeners.forEach((listener) => listener("error"));
     this.socket.onclose = () => {
       this.connectionListeners.forEach((listener) => listener("disconnected"));
-      this.reconnectTimer = window.setTimeout(() => this.connect(), 2500);
+      if (!this.stopped) this.reconnectTimer = window.setTimeout(() => this.connect(), 2500);
     };
   }
 }

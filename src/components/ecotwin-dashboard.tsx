@@ -37,9 +37,24 @@ import {
 import { EcoTwinMap } from "@/components/ecotwin-map";
 import { MetricCard } from "@/components/metric-card";
 import { Button } from "@/components/ui/button";
-import { addTimelinePoint, createMockSnapshot, getMockDecision, getMockHotspots, getPollutionBand } from "@/lib/mock-simulation";
-import type { SignalPhase, SimulationSnapshot, SimulationStatus, TimelinePoint } from "@/lib/ecotwin-types";
-import { getSimulationMode, createSimulationStream, type StreamConnection } from "@/lib/simulation-stream";
+import {
+  addTimelinePoint,
+  createMockSnapshot,
+  getMockDecision,
+  getMockHotspots,
+  getPollutionBand,
+} from "@/lib/mock-simulation";
+import type {
+  SignalPhase,
+  SimulationSnapshot,
+  SimulationStatus,
+  TimelinePoint,
+} from "@/lib/ecotwin-types";
+import {
+  createSimulationStream,
+  getSimulationMode,
+  type StreamConnection,
+} from "@/lib/simulation-stream";
 import { snapshotToState, stateToSnapshot, type SimulationState } from "@/lib/simulation-contract";
 
 type SignalFilter = "all" | "high-co2" | "long-queue" | "rl";

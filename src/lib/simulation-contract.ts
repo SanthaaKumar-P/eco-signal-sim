@@ -154,6 +154,9 @@ export function snapshotToState(snapshot: SimulationSnapshot, rlEnabled: boolean
 }
 
 export function payloadToState(payload: unknown): SimulationState {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("EcoTwin telemetry payload must be an object");
+  }
   const value = payload as Record<string, unknown>;
   const metrics = (value["metrics"] ?? {}) as Record<string, unknown>;
   const rawVehicles = Array.isArray(value["vehicles"]) ? value["vehicles"] : [];
@@ -208,7 +211,6 @@ export function payloadToState(payload: unknown): SimulationState {
 }
 
 export function stateToSnapshot(state: SimulationState): SimulationSnapshot {
-  const signalById = new Map(state.signals.map((signal) => [signal.id, signal]));
   const vehicles: Vehicle[] = state.vehicles.map(({ waiting_time: _waitingTime, ...vehicle }) => vehicle);
   const intersections: Intersection[] = state.intersections.map((item) => ({
     id: item.id, x: item.x, y: item.y, queueLength: item.queue_length,
@@ -225,7 +227,7 @@ export function stateToSnapshot(state: SimulationState): SimulationSnapshot {
     metrics: {
       vehicleCount: state.metrics.vehicle_count,
       avgWaitingTime: state.metrics.avg_waiting_time,
-      queueLength: Math.round(state.metrics.avg_queue_length * Math.max(intersections.length, 1)),
+      queueLength: Math.round(state.intersections.reduce((total, intersection) => total + intersection.queue_length, 0)),
       totalCo2: state.metrics.total_co2,
       rlReward: state.metrics.rl_reward,
     },

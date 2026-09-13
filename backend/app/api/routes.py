@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.models.schemas import ComparisonResult, RlToggle, SimulationSnapshot, StatusResponse, ToggleResponse
 from app.services.mock import MockSimulationService

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 SignalPhase = Literal["NS_GREEN", "EW_GREEN", "YELLOW", "ALL_RED"]
@@ -46,19 +46,27 @@ class Metrics(BaseModel):
     rl_reward: float
 
 
+class PollutionCell(BaseModel):
+    id: str
+    x: float
+    y: float
+    co2: float
+    pollution_level: PollutionLevel
+
+
 class SimulationState(BaseModel):
     timestamp: int
     simulation_status: Literal["running", "paused", "stopped", "error"]
     vehicles: list[Vehicle]
     signals: list[Signal]
     intersections: list[Intersection]
-    pollution_cells: list[dict[str, str | float]]
+    pollution_cells: list[PollutionCell]
     metrics: Metrics
     rl: "RlAction"
 
 
 class SimulationSnapshot(SimulationState):
-    """Compatibility name for the backend simulation service."""
+    """Normalized snapshot returned by the simulation adapter."""
 
 
 class RlAction(BaseModel):
